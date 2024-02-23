@@ -1,9 +1,7 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect
 import mysql.connector
-import hashlib
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'  # Change this to a secure secret key
 
 # Replace these values with your MySQL server credentials
 host = "localhost"
@@ -20,42 +18,37 @@ def get_database_connection():
         database=database
     )
 
-# Function to create a 'login' table in the database if it doesn't exist
+# Route to display the music library
+@app.route('/')
+def show_login():
+    connection = get_database_connection()
+    cursor = connection.cursor()
 
-# Route to display the login page
-@app.route('/', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+    # Retrieve data from the music table
+    cursor.execute("SELECT * FROM login")
+    music_data = cursor.fetchall()
 
-        connection = get_database_connection()
-        cursor = connection.cursor()
+    connection.close()
 
-        # Check if the provided username exists
-        cursor.execute("SELECT * FROM login WHERE username=%s", (username,))
-        existing_user = cursor.fetchone()
+    return render_template('login.html')
 
-        if existing_user:
-            # User already exists, render the login page with an error message
-            connection.close()
-            return render_template('login.html', error="Username already taken")
+# Route to insert new data into the music table
+@app.route('/login', methods=['POST'])
+def add_song():
+    username = request.form['username']
+    password = request.form['password']
 
-        # Save the new user's credentials to the 'login' table
-        hashed_password = hashlib.sha256(password.encode()).hexdigest()
-        cursor.execute("INSERT INTO login (username, password) VALUES (%s, %s)", (username, hashed_password))
-        connection.commit()
+    connection = get_database_connection()
+    cursor = connection.cursor()
 
-        connection.close()
+    # Insert new data into the music table
+    cursor.execute("INSERT INTO login (username,password) VALUES (%s, %s)",
+                   (username,password))
+    connection.commit()
 
-        # Registration successful, store username in session and render a welcome message
-        session['username'] = username
-        return render_template('login.html', username=username)
+    connection.close()
 
-    return render_template('login.html', error=None)
-
-# Route to logout
-
+    return redirect('/')
 
 if __name__ == '__main__':
     app.run(debug=True)
